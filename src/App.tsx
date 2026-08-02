@@ -37,7 +37,10 @@ function App() {
 
   /** 获取汇率并计算 */
   const calculate = useCallback(async () => {
-    if (!amount || amount <= 0) return
+    if (!amountStr.trim() || amount <= 0) {
+      setResults([])
+      return
+    }
     setLoading(true)
     setError(null)
 
