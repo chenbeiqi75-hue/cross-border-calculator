@@ -1,16 +1,11 @@
 /**
- * 各银行跨境汇款费率配置（用户核实版）
+ * 各银行跨境汇款费率配置
  *
- * 数据来源：用户对各银行公开收费标准的核实
+ * buyRate / sellRate: 银行现汇买入价/卖出价（1 外币 = X 人民币）
+ *   - null 表示未知，计算时使用市场中间价作为最佳估计
+ *   - 用户应查询当日银行外汇牌价后填入实际数值
  *
- * 关于「汇率加点」的说明：
- * - 银行公开收费标准中不公布固定汇率加点
- * - 实际汇率成本 = 银行现汇卖出价 vs 市场中间价的每日差值
- * - 因此本配置中 markup 默认为 0，用户可在使用当天根据银行挂牌价自行调整
- * - 或者直接在计算器中输入银行现汇卖出价
- *
- * feeMinCNY / feeMaxCNY: 手续费人民币等值最低/最高限额（0=无上限）
- * deductFromForeign: true=费用以外币收取，false=以人民币收取
+ * 数据来源：用户对各行公开收费标准的核实
  */
 import type { Bank } from './types'
 
@@ -22,12 +17,21 @@ function defaultRates(
   feeMaxCNY: number,
   telegraphFeeCNY: number,
   deductFromForeign: boolean,
-): Record<string, { spreadPercent: number; feePercent: number; feeMinCNY: number; feeMaxCNY: number; telegraphFeeCNY: number; deductFromForeign: boolean; supported: boolean }> {
+): Record<string, {
+  sellRate: number | null
+  buyRate: number | null
+  feePercent: number
+  feeMinCNY: number
+  feeMaxCNY: number
+  telegraphFeeCNY: number
+  deductFromForeign: boolean
+  supported: boolean
+}> {
   const rates: Record<string, any> = {}
   for (const code of ALL_CURRENCIES) {
     rates[code] = {
-      // 汇率加点默认为 0，用户根据当日银行挂牌价自行填写
-      spreadPercent: 0,
+      sellRate: null,
+      buyRate: null,
       feePercent,
       feeMinCNY,
       feeMaxCNY,

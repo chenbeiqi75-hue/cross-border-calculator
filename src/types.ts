@@ -5,19 +5,21 @@ export interface Currency {
   symbol: string
 }
 
-/** 银行费率配置（同一银行不同币种费率不同） */
+/** 银行费率配置 */
 export interface BankRate {
-  /** 汇率加点百分比（如 2.0 = 银行比中间价贵 2%） */
-  spreadPercent: number
+  /** 银行现汇卖出价：1 外币 = X 人民币（银行卖外币给你，用于人民币→外币场景） */
+  sellRate: number | null
+  /** 银行现汇买入价：1 外币 = X 人民币（银行买你的外币，用于外币→人民币场景） */
+  buyRate: number | null
   /** 手续费比例（如 0.001 = 0.1%） */
   feePercent: number
   /** 手续费最低收费（折合人民币） */
   feeMinCNY: number
-  /** 手续费最高收费（折合人民币，0 = 无上限） */
+  /** 手续费最高收费（折合人民币，0=无上限） */
   feeMaxCNY: number
   /** 电报费/电讯费（折合人民币） */
   telegraphFeeCNY: number
-  /** 费用是否以汇款币种收取（true=从外币扣，false=从人民币扣） */
+  /** 费用是否以汇款币种收取 */
   deductFromForeign: boolean
   /** 是否支持该币种 */
   supported: boolean
@@ -37,9 +39,9 @@ export interface CalculationResult {
   bankName: string
   /** 中间价：1 转出币种 = X 目标币种 */
   midRate: number
-  /** 银行实际汇率（加点后） */
+  /** 银行实际汇率（根据方向选择买入价或卖出价） */
   bankRate: number
-  /** 手续费总额（折合人民币） */
+  /** 手续费用总额（折合人民币） */
   totalFeeCNY: number
   /** 到账金额（目标币种） */
   receivedAmount: number
@@ -49,7 +51,7 @@ export interface CalculationResult {
   savedComparedToWorst: number
 }
 
-/** 方向 */
+/** 汇兑方向 */
 export type TransferDirection = 'send' | 'receive'
 
 /** 表单输入 */

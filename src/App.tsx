@@ -62,7 +62,7 @@ function App() {
     setLoading(false)
   }, [amountStr, amount, fromCurrency, toCurrency, direction, lockMode, banks])
 
-  const handleBankUpdate = (bankId: string, field: string, value: number | boolean) => {
+  const handleBankUpdate = (bankId: string, field: string, value: number | boolean | null) => {
     setBanks(prev =>
       prev.map(b => {
         if (b.id !== bankId) return b
@@ -214,11 +214,11 @@ function App() {
               <thead>
                 <tr>
                   <th>银行</th>
-                  <th>汇率加点</th>
+                  <th>牌价类型</th>
                   <th>银行汇率</th>
                   <th>手续费</th>
                   <th>电报费</th>
-                  <th>总费用（元）</th>
+                  <th>总成本（¥）</th>
                   {lockMode === 'sendAmount' ? (
                     <th className="amount-col">到账金额</th>
                   ) : (
@@ -270,28 +270,41 @@ function App() {
           <div className="config-grid">
             {banks.map(bank => {
               const rate = bank.rates[toCurrency]
-              const bankSellingRate = midRate != null
-                ? midRate / (1 + (rate?.spreadPercent ?? 0) / 100)
-                : null
+              const sellRate = rate?.sellRate
+              const buyRate = rate?.buyRate
               return (
                 <div key={bank.id} className="bank-config-card">
                   <h3>{bank.name}</h3>
 
-                  {midRate != null && bankSellingRate != null && (
+                  {midRate != null && (
                     <div className="rate-info">
-                      银行汇率：<strong>{fmtMoney(bankSellingRate, 6)}</strong>
-                      <span className="rate-hint">（中间价 {fmtMoney(midRate, 6)}）</span>
+                      市场中间价：<strong>{fmtMoney(midRate, 6)}</strong>
                     </div>
                   )}
 
                   <label>
-                    汇率差价（%，0=与中间价相同）
+                    卖出价（1{getCurrencySymbol(toCurrency)}=?元）💰
+                    <span className="rate-hint">银行卖外币给你</span>
                     <input
                       type="number"
-                      step="0.1"
-                      value={rate?.spreadPercent ?? 0}
+                      step="0.0001"
+                      placeholder={midRate ? String(1 / midRate) : ''}
+                      value={sellRate ?? ''}
                       onChange={e =>
-                        handleBankUpdate(bank.id, 'spreadPercent', Number(e.target.value))
+                        handleBankUpdate(bank.id, 'sellRate', e.target.value ? Number(e.target.value) : null)
+                      }
+                    />
+                  </label>
+                  <label>
+                    买入价（1{getCurrencySymbol(toCurrency)}=?元）💴
+                    <span className="rate-hint">银行买你的外币</span>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      placeholder={midRate ? String(midRate) : ''}
+                      value={buyRate ?? ''}
+                      onChange={e =>
+                        handleBankUpdate(bank.id, 'buyRate', e.target.value ? Number(e.target.value) : null)
                       }
                     />
                   </label>
