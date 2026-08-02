@@ -277,6 +277,31 @@
   margin-left: 8px;
 }
 
+.fetch-rates-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--accent-light);
+  border: 1px dashed var(--accent-border);
+  border-radius: 10px;
+  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 8px;
+}
+
+.fetch-rates-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: white;
+  border-style: solid;
+}
+
+.fetch-rates-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .config-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

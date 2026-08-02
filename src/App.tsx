@@ -75,6 +75,40 @@ function App() {
     )
   }
 
+  /** 从 API 获取各银行实时牌价 */
+  const [fetchingRates, setFetchingRates] = useState(false)
+  const handleFetchRates = async () => {
+    setFetchingRates(true)
+    try {
+      const res = await fetch('/api/bank-rates')
+      if (!res.ok) throw new Error('API request failed')
+      const data = await res.json()
+      const fetched = data.rates as Record<string, { bankId: string; bankName: string; rates: Record<string, { sellRate: number | null; buyRate: number | null }> }>
+
+      setBanks(prev =>
+        prev.map(b => {
+          const match = fetched[b.id]
+          if (!match || Object.keys(match.rates).length === 0) return b
+          const newRates = { ...b.rates }
+          for (const code of Object.keys(newRates)) {
+            const fetchedRate = match.rates[code]
+            if (fetchedRate) {
+              newRates[code] = {
+                ...newRates[code],
+                sellRate: fetchedRate.sellRate,
+                buyRate: fetchedRate.buyRate,
+              }
+            }
+          }
+          return { ...b, rates: newRates }
+        }),
+      )
+    } catch (err) {
+      console.error('获取银行牌价失败:', err)
+    }
+    setFetchingRates(false)
+  }
+
   const handleDirectionChange = (d: TransferDirection) => {
     setDirection(d)
     if (d === 'send') {
@@ -264,6 +298,13 @@ function App() {
         >
           {showConfig ? '收起' : '展开'}银行费率配置
           <span className="config-hint">（点击修改各银行的实际费率）</span>
+        </button>
+        <button
+          className="fetch-rates-btn"
+          onClick={handleFetchRates}
+          disabled={fetchingRates}
+        >
+          {fetchingRates ? '正在抓取...' : '从银行官网获取实时牌价（需部署后生效）'}
         </button>
 
         {showConfig && (
