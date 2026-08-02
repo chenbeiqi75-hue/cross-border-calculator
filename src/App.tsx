@@ -230,7 +230,7 @@ function App() {
                       </td>
                       <td>{fee.rateLabel}</td>
                       <td>{fmtMoney(r.bankRate, 6)}</td>
-                      <td>{fee.feePercentLabel}</td>
+                      <td>{fee.feeMinMaxLabel}</td>
                       <td>{fmtMoney(fee.telegraphFeeCNY)}</td>
                       <td>{fmtMoney(fee.totalFeeCNY)}</td>
                       <td className="amount-col">

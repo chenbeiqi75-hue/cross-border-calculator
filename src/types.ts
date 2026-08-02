@@ -5,16 +5,20 @@ export interface Currency {
   symbol: string
 }
 
-/** 银行费率配置 */
+/** 银行费率配置（同一银行不同币种费率不同） */
 export interface BankRate {
-  /** 手续费：按比例（如 0.001 = 0.1%） */
-  feePercent: number
-  /** 手续费：固定金额（人民币，CNY） */
-  feeFixedCNY: number
-  /** 电报费/电讯费（人民币） */
-  telegraphFeeCNY: number
-  /** 汇率加点（相对于中间价的百分比偏移，正=加价，负=折价） */
+  /** 汇率加点百分比（如 2.0 = 银行比中间价贵 2%） */
   spreadPercent: number
+  /** 手续费比例（如 0.001 = 0.1%） */
+  feePercent: number
+  /** 手续费最低收费（折合人民币） */
+  feeMinCNY: number
+  /** 手续费最高收费（折合人民币，0 = 无上限） */
+  feeMaxCNY: number
+  /** 电报费/电讯费（折合人民币） */
+  telegraphFeeCNY: number
+  /** 费用是否以汇款币种收取（true=从外币扣，false=从人民币扣） */
+  deductFromForeign: boolean
   /** 是否支持该币种 */
   supported: boolean
 }
@@ -23,7 +27,7 @@ export interface BankRate {
 export interface Bank {
   id: string
   name: string
-  /** 币种 → 费率 */
+  /** 目标币种代码 → 费率 */
   rates: Record<string, BankRate>
 }
 
@@ -31,21 +35,21 @@ export interface Bank {
 export interface CalculationResult {
   bankId: string
   bankName: string
-  /** 中间价 */
+  /** 中间价：1 转出币种 = X 目标币种 */
   midRate: number
-  /** 银行实际汇率 */
+  /** 银行实际汇率（加点后） */
   bankRate: number
-  /** 手续费总额（人民币） */
+  /** 手续费总额（折合人民币） */
   totalFeeCNY: number
   /** 到账金额（目标币种） */
   receivedAmount: number
-  /** 是否最低到账 */
+  /** 是否最优 */
   isBest: boolean
-  /** 比最高节省 */
+  /** 比最差节省（折合人民币） */
   savedComparedToWorst: number
 }
 
-/** 方向：汇款还是汇回 */
+/** 方向 */
 export type TransferDirection = 'send' | 'receive'
 
 /** 表单输入 */
@@ -55,5 +59,5 @@ export interface FormInputs {
   toCurrency: string
 }
 
-/** 锁定模式：锁定转出金额（算能收到多少）还是锁定到账金额（算需要汇多少） */
+/** 锁定模式 */
 export type LockMode = 'sendAmount' | 'receiveAmount'
