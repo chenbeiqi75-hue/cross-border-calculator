@@ -19,10 +19,7 @@ export interface FeeBreakdown {
  *   send（人民币→外币）→ 银行现汇卖出价（银行卖外币给你）
  *   receive（外币→人民币）→ 银行现汇买入价（银行买你的外币）
  *
- *   sellRate / buyRate 存储格式：1 外币 = X 人民币
- *   midRate 格式：1 转出币种 = X 目标币种
- *   - send 时 midRate = 1 CNY = X 外币，bankRate = 1/sellRate
- *   - receive 时 midRate = 1 外币 = X CNY，bankRate = buyRate
+ *   当用户未填入实际牌价时，使用 estimatedSpreadPct 从中间价推导。
  */
 export function calculateAll(
   banks: Bank[],
@@ -37,10 +34,8 @@ export function calculateAll(
     .filter(b => b.rates[toCurrency]?.supported)
     .map(b => {
       const rate = b.rates[toCurrency]
-      // 根据方向选牌价，单位统一到 midRate 的格式
-      const bankRate = direction === 'send'
-        ? (rate.sellRate != null ? 1 / rate.sellRate : midRate)
-        : (rate.buyRate != null ? rate.buyRate : midRate)
+      // 计算实际使用的银行汇率
+      const bankRate = computeBankRate(rate, midRate, direction)
 
       if (lockMode === 'sendAmount') {
         return forwardCalc(b.id, b.name, bankRate, midRate, amount, direction, rate)
@@ -71,6 +66,21 @@ export function calculateAll(
   )
 
   return results
+}
+
+/** 根据方向计算银行实际汇率，牌价未知时用估算价差 */
+function computeBankRate(rate: BankRate, midRate: number, direction: TransferDirection): number {
+  if (direction === 'send') {
+    // 卖出价：1 外币 = sellRate CNY → bankRate = 1/sellRate（1 CNY = X 外币）
+    if (rate.sellRate != null) return 1 / rate.sellRate
+    // 未填：用价差估算，银行卖得比中间价贵
+    return midRate / (1 + rate.estimatedSpreadPct / 100)
+  } else {
+    // 买入价：1 外币 = buyRate CNY → bankRate = buyRate（单位一致）
+    if (rate.buyRate != null) return rate.buyRate
+    // 未填：用价差估算，银行买得比中间价便宜
+    return midRate * (1 - rate.estimatedSpreadPct / 100)
+  }
 }
 
 /** 手续费计算（CNY 等值，含 min/max） */
@@ -147,26 +157,27 @@ function feeBreakdown(
   midRate: number, direction: TransferDirection,
 ): FeeBreakdown {
   const priceType = direction === 'send' ? '现汇卖出价' : '现汇买入价'
+  const hasActualRate = direction === 'send' ? rate.sellRate != null : rate.buyRate != null
 
   let displayedRate: number
   let spreadPct: number
+
   if (direction === 'send') {
-    // 显示原始的卖出价（1 外币 = X 人民币）
-    displayedRate = rate.sellRate ?? 1 / midRate
+    displayedRate = rate.sellRate != null ? rate.sellRate : (1 / midRate) * (1 + rate.estimatedSpreadPct / 100)
+    const midCnyRate = 1 / midRate
     spreadPct = rate.sellRate != null
-      ? ((rate.sellRate - 1 / midRate) / (1 / midRate)) * 100
-      : 0
+      ? ((rate.sellRate - midCnyRate) / midCnyRate) * 100
+      : rate.estimatedSpreadPct
   } else {
-    displayedRate = rate.buyRate ?? midRate
+    displayedRate = rate.buyRate != null ? rate.buyRate : midRate * (1 - rate.estimatedSpreadPct / 100)
     spreadPct = rate.buyRate != null
       ? ((midRate - rate.buyRate) / midRate) * 100
-      : 0
+      : rate.estimatedSpreadPct
   }
 
-  const hasRate = direction === 'send' ? rate.sellRate != null : rate.buyRate != null
-  const rateLabel = hasRate
+  const rateLabel = hasActualRate
     ? `${priceType} ${displayedRate.toFixed(6)} CNY/外币（价差 ${Math.abs(spreadPct).toFixed(2)}%）`
-    : `使用市场中间价（未填银行牌价）`
+    : `估算 ${priceType} ${displayedRate.toFixed(6)} CNY/外币（估算价差 ${spreadPct.toFixed(2)}%）`
 
   const capStr = rate.feeMinCNY > 0 || rate.feeMaxCNY > 0
     ? `（最低¥${rate.feeMinCNY}/最高¥${rate.feeMaxCNY > 0 ? rate.feeMaxCNY : '无'})`

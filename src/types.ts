@@ -7,6 +7,8 @@ export interface Currency {
 
 /** 银行费率配置 */
 export interface BankRate {
+  /** 银行典型价差（百分比，如 0.8 = 0.8%），当未填入实际牌价时用此估算 */
+  estimatedSpreadPct: number
   /** 银行现汇卖出价：1 外币 = X 人民币（银行卖外币给你，用于人民币→外币场景） */
   sellRate: number | null
   /** 银行现汇买入价：1 外币 = X 人民币（银行买你的外币，用于外币→人民币场景） */
