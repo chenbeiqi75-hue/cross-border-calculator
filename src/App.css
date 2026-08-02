@@ -35,7 +35,19 @@
 .direction-toggle {
   display: flex;
   gap: 8px;
+  margin-bottom: 12px;
+}
+
+.lock-toggle {
+  display: flex;
+  gap: 8px;
   margin-bottom: 20px;
+}
+
+.toggle-sm {
+  font-size: 13px;
+  padding: 6px 14px;
+  flex: 0 1 auto;
 }
 
 .toggle-btn {

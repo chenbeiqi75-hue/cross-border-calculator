@@ -1,22 +1,27 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Bank, FormInputs, CalculationResult, TransferDirection } from './types'
+import type { Bank, CalculationResult, TransferDirection, LockMode } from './types'
 import { currencies, getCurrencySymbol } from './currencies'
 import { DEFAULT_BANKS } from './bankRates'
 import { getMidRate } from './exchangeRate'
 import { calculateAll, type FeeBreakdown } from './calculator'
 import './App.css'
 
-/** 汇出方向标签 */
 const DIRECTION_LABELS: Record<TransferDirection, string> = {
   send: '汇款出去（人民币 → 外币）',
   receive: '汇回国内（外币 → 人民币）',
 }
 
+const LOCK_LABELS: Record<LockMode, string> = {
+  sendAmount: '锁定汇出金额',
+  receiveAmount: '锁定到账金额',
+}
+
 function App() {
-  const [amount, setAmount] = useState(10000)
+  const [amountStr, setAmountStr] = useState('10000')
   const [fromCurrency, setFromCurrency] = useState('CNY')
   const [toCurrency, setToCurrency] = useState('USD')
   const [direction, setDirection] = useState<TransferDirection>('send')
+  const [lockMode, setLockMode] = useState<LockMode>('sendAmount')
   const [banks, setBanks] = useState<Bank[]>(() =>
     structuredClone(DEFAULT_BANKS),
   )
@@ -27,6 +32,8 @@ function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showConfig, setShowConfig] = useState(false)
+
+  const amount = Number(amountStr) || 0
 
   /** 获取汇率并计算 */
   const calculate = useCallback(async () => {
@@ -43,16 +50,15 @@ function App() {
       }
       setMidRate(rate)
 
-      const inputs: FormInputs = { amount, fromCurrency, toCurrency }
-      const calcResults = calculateAll(banks, rate, inputs, direction)
+      const inputs = { amount, fromCurrency, toCurrency }
+      const calcResults = calculateAll(banks, rate, inputs, direction, lockMode)
       setResults(calcResults)
     } catch {
       setError('计算出现错误，请重试')
     }
     setLoading(false)
-  }, [amount, fromCurrency, toCurrency, direction, banks])
+  }, [amount, fromCurrency, toCurrency, direction, lockMode, banks])
 
-  // 输入变化时自动计算
   useEffect(() => {
     calculate()
   }, [calculate])
@@ -70,15 +76,6 @@ function App() {
     )
   }
 
-  /** 格式化数字 */
-  const fmtMoney = (n: number, decimals = 2) => n.toLocaleString('zh-CN', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })
-
-  const availableTargets = currencies.filter(c => c.code !== fromCurrency)
-
-  // 设置默认方向时自动切换币种
   const handleDirectionChange = (d: TransferDirection) => {
     setDirection(d)
     if (d === 'send') {
@@ -90,6 +87,17 @@ function App() {
     }
   }
 
+  const fmtMoney = (n: number, decimals = 2) => n.toLocaleString('zh-CN', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+
+  const availableTargets = currencies.filter(c => c.code !== fromCurrency)
+
+  const amountLabel = lockMode === 'sendAmount'
+    ? `汇出金额（${getCurrencySymbol(fromCurrency)}）`
+    : `目标到账金额（${getCurrencySymbol(toCurrency)}）`
+
   return (
     <div className="app">
       <header className="header">
@@ -99,6 +107,7 @@ function App() {
 
       {/* ====== 输入区 ====== */}
       <section className="input-section">
+        {/* 方向切换 */}
         <div className="direction-toggle">
           {(['send', 'receive'] as TransferDirection[]).map(d => (
             <button
@@ -111,14 +120,28 @@ function App() {
           ))}
         </div>
 
+        {/* 锁定模式切换 */}
+        <div className="lock-toggle">
+          {(['sendAmount', 'receiveAmount'] as LockMode[]).map(m => (
+            <button
+              key={m}
+              className={`toggle-btn toggle-sm ${m === lockMode ? 'active' : ''}`}
+              onClick={() => setLockMode(m)}
+            >
+              {LOCK_LABELS[m]}
+            </button>
+          ))}
+        </div>
+
         <div className="input-row">
           <div className="input-group">
-            <label>金额</label>
+            <label>{amountLabel}</label>
             <input
               type="number"
-              value={amount}
+              value={amountStr}
               min={0}
-              onChange={e => setAmount(Number(e.target.value))}
+              placeholder="输入金额"
+              onChange={e => setAmountStr(e.target.value)}
             />
           </div>
 
@@ -171,7 +194,9 @@ function App() {
         <section className="results-section">
           <h2>银行对比结果</h2>
           <p className="results-hint">
-            按到账金额从高到低排序（最划算的排最上面）
+            {lockMode === 'sendAmount'
+              ? '按到账金额从高到低排序（最划算的排最上面）'
+              : '按需汇出金额从低到高排序（最划算的排最上面）'}
           </p>
 
           <div className="table-wrapper">
@@ -184,29 +209,37 @@ function App() {
                   <th>手续费</th>
                   <th>电报费</th>
                   <th>总费用（元）</th>
-                  <th className="amount-col">到账金额</th>
+                  {lockMode === 'sendAmount' ? (
+                    <th className="amount-col">到账金额</th>
+                  ) : (
+                    <th className="amount-col">需汇出金额</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
-                {results.map(({ result: r, fee }) => (
-                  <tr key={r.bankId} className={r.isBest ? 'best-row' : ''}>
-                    <td className="bank-name">
-                      {r.isBest && <span className="badge">推荐</span>}
-                      {r.bankName}
-                    </td>
-                    <td>{fee.rateLabel}</td>
-                    <td>{fmtMoney(r.bankRate, 6)}</td>
-                    <td>{fee.feePercentLabel}</td>
-                    <td>{fmtMoney(fee.telegraphFeeCNY)}</td>
-                    <td>{fmtMoney(fee.totalFeeCNY)}</td>
-                    <td className="amount-col">
-                      <strong>
-                        {getCurrencySymbol(toCurrency)}
-                        {fmtMoney(r.receivedAmount)}
-                      </strong>
-                    </td>
-                  </tr>
-                ))}
+                {results.map(({ result: r, fee }) => {
+                  const isReceiveLock = lockMode === 'receiveAmount'
+                  return (
+                    <tr key={r.bankId} className={r.isBest ? 'best-row' : ''}>
+                      <td className="bank-name">
+                        {r.isBest && <span className="badge">推荐</span>}
+                        {r.bankName}
+                      </td>
+                      <td>{fee.rateLabel}</td>
+                      <td>{fmtMoney(r.bankRate, 6)}</td>
+                      <td>{fee.feePercentLabel}</td>
+                      <td>{fmtMoney(fee.telegraphFeeCNY)}</td>
+                      <td>{fmtMoney(fee.totalFeeCNY)}</td>
+                      <td className="amount-col">
+                        <strong>
+                          {isReceiveLock
+                            ? `${getCurrencySymbol(fromCurrency)}${fmtMoney(fee.requiredSendAmount ?? 0)}`
+                            : `${getCurrencySymbol(toCurrency)}${fmtMoney(r.receivedAmount)}`}
+                        </strong>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

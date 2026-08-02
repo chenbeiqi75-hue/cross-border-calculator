@@ -54,3 +54,6 @@ export interface FormInputs {
   fromCurrency: string
   toCurrency: string
 }
+
+/** 锁定模式：锁定转出金额（算能收到多少）还是锁定到账金额（算需要汇多少） */
+export type LockMode = 'sendAmount' | 'receiveAmount'
