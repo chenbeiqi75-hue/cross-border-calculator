@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { Bank, CalculationResult, TransferDirection, LockMode } from './types'
 import { currencies, getCurrencySymbol } from './currencies'
 import { DEFAULT_BANKS } from './bankRates'
@@ -35,10 +35,10 @@ function App() {
 
   const amount = Number(amountStr) || 0
 
-  /** 获取汇率并计算 */
-  const calculate = useCallback(async () => {
+  /** 手动查询汇率并计算 */
+  const handleQuery = useCallback(async () => {
     if (!amountStr.trim() || amount <= 0) {
-      setResults([])
+      setError('请输入有效金额')
       return
     }
     setLoading(true)
@@ -60,13 +60,9 @@ function App() {
       setError('计算出现错误，请重试')
     }
     setLoading(false)
-  }, [amount, fromCurrency, toCurrency, direction, lockMode, banks])
+  }, [amountStr, amount, fromCurrency, toCurrency, direction, lockMode, banks])
 
-  useEffect(() => {
-    calculate()
-  }, [calculate])
-
-  const handleBankUpdate = (bankId: string, field: string, value: number) => {
+  const handleBankUpdate = (bankId: string, field: string, value: number | boolean) => {
     setBanks(prev =>
       prev.map(b => {
         if (b.id !== bankId) return b
@@ -188,6 +184,17 @@ function App() {
         )}
       </section>
 
+      {/* ====== 查询按钮 ====== */}
+      <div className="query-section">
+        <button
+          className="query-btn"
+          onClick={handleQuery}
+          disabled={loading}
+        >
+          {loading ? '正在查询...' : '查询各银行费用对比'}
+        </button>
+      </div>
+
       {/* ====== 加载 & 错误 ====== */}
       {loading && <div className="loading">正在获取实时汇率...</div>}
       {error && <div className="error">{error}</div>}
@@ -261,44 +268,90 @@ function App() {
 
         {showConfig && (
           <div className="config-grid">
-            {banks.map(bank => (
-              <div key={bank.id} className="bank-config-card">
-                <h3>{bank.name}</h3>
-                <label>
-                  汇率加点（%）
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={bank.rates[toCurrency]?.spreadPercent ?? 0}
-                    onChange={e =>
-                      handleBankUpdate(bank.id, 'spreadPercent', Number(e.target.value))
-                    }
-                  />
-                </label>
-                <label>
-                  手续费比例（%）
-                  <input
-                    type="number"
-                    step="0.05"
-                    value={((bank.rates[toCurrency]?.feePercent ?? 0) * 100).toFixed(2)}
-                    onChange={e =>
-                      handleBankUpdate(bank.id, 'feePercent', Number(e.target.value) / 100)
-                    }
-                  />
-                </label>
-                <label>
-                  电报费（元）
-                  <input
-                    type="number"
-                    step="10"
-                    value={bank.rates[toCurrency]?.telegraphFeeCNY ?? 0}
-                    onChange={e =>
-                      handleBankUpdate(bank.id, 'telegraphFeeCNY', Number(e.target.value))
-                    }
-                  />
-                </label>
-              </div>
-            ))}
+            {banks.map(bank => {
+              const rate = bank.rates[toCurrency]
+              const bankSellingRate = midRate != null
+                ? midRate / (1 + (rate?.spreadPercent ?? 0) / 100)
+                : null
+              return (
+                <div key={bank.id} className="bank-config-card">
+                  <h3>{bank.name}</h3>
+
+                  {midRate != null && bankSellingRate != null && (
+                    <div className="rate-info">
+                      银行汇率：<strong>{fmtMoney(bankSellingRate, 6)}</strong>
+                      <span className="rate-hint">（中间价 {fmtMoney(midRate, 6)}）</span>
+                    </div>
+                  )}
+
+                  <label>
+                    汇率差价（%，0=与中间价相同）
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={rate?.spreadPercent ?? 0}
+                      onChange={e =>
+                        handleBankUpdate(bank.id, 'spreadPercent', Number(e.target.value))
+                      }
+                    />
+                  </label>
+                  <label>
+                    手续费比例（%）
+                    <input
+                      type="number"
+                      step="0.05"
+                      value={((rate?.feePercent ?? 0) * 100).toFixed(2)}
+                      onChange={e =>
+                        handleBankUpdate(bank.id, 'feePercent', Number(e.target.value) / 100)
+                      }
+                    />
+                  </label>
+                  <div className="config-row">
+                    <label>
+                      最低（¥）
+                      <input
+                        type="number"
+                        value={rate?.feeMinCNY ?? 0}
+                        onChange={e =>
+                          handleBankUpdate(bank.id, 'feeMinCNY', Number(e.target.value))
+                        }
+                      />
+                    </label>
+                    <label>
+                      最高（¥）
+                      <input
+                        type="number"
+                        value={rate?.feeMaxCNY ?? 0}
+                        onChange={e =>
+                          handleBankUpdate(bank.id, 'feeMaxCNY', Number(e.target.value))
+                        }
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    电报费（元）
+                    <input
+                      type="number"
+                      step="10"
+                      value={rate?.telegraphFeeCNY ?? 0}
+                      onChange={e =>
+                        handleBankUpdate(bank.id, 'telegraphFeeCNY', Number(e.target.value))
+                      }
+                    />
+                  </label>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={rate?.deductFromForeign ?? false}
+                      onChange={e =>
+                        handleBankUpdate(bank.id, 'deductFromForeign', e.target.checked)
+                      }
+                    />
+                    费用以汇款币种收取（农行模式）
+                  </label>
+                </div>
+              )
+            })}
           </div>
         )}
       </section>
