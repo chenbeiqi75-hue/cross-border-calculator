@@ -10,7 +10,7 @@
  */
 import type { Bank } from './types'
 
-const ALL_CURRENCIES = ['USD', 'HKD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'SGD', 'KRW', 'THB']
+const ALL_CURRENCIES = ['USD', 'HKD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'SGD', 'KRW', 'THB', 'CNY']
 
 function defaultRates(
   spreadPercent: number,
